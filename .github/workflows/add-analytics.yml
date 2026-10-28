@@ -1,0 +1,63 @@
+
+name: Install Google Analytics
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout website
+        uses: actions/checkout@v4
+
+      - name: Add Analytics to HTML files
+        shell: python
+        run: |
+          from pathlib import Path
+
+          tag = """<!-- Google Analytics -->
+          <script async src="https://www.googletagmanager.com/gtag/js?id=G-F63KWM45P6"></script>
+          <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-F63KWM45P6');
+          </script>
+          """
+
+          count = 0
+          for path in Path(".").rglob("*.html"):
+              if ".git" in path.parts:
+                  continue
+              html = path.read_text(encoding="utf-8")
+              if "G-F63KWM45P6" in html:
+                  continue
+              if "</head>" not in html.lower():
+                  continue
+              import re
+              html = re.sub(
+                  r"</head>",
+                  lambda m: tag + "\n" + m.group(),
+                  html,
+                  count=1,
+                  flags=re.IGNORECASE
+              )
+              path.write_text(html, encoding="utf-8")
+              count += 1
+
+          print(f"Updated {count} HTML files")
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add '*.html'
+          if ! git diff --cached --quiet; then
+            git commit -m "Add Google Analytics tracking"
+            git push
+          fi
+          
